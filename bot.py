@@ -67,13 +67,17 @@ def check():
 # json_acceptable_string = s.replace("'", "\"")
 # d = json.loads(json_acceptable_string)
 
-start_time = time.time()
-tradesin5min=0
-print('Checking for offers...')
-print('Heartbeat Sent to backpack.tf {} listings were bumped'.format(tf2.bp_send_heartbeat()))
 
-while True:
-    try:
+
+
+if __name__ == "__main__":
+    start_time = time.time()
+    tradesin5min=0
+    print('Checking for offers...')
+    print('Heartbeat Sent to backpack.tf {} listings were bumped'.format(tf2.bp_send_heartbeat()))
+
+    while True:
+        # try:
         if check(): tradesin5min += 1
         # print("messages: ", client.chat.fetch_messages())
         if time.time() - start_time > 5*60:
@@ -82,8 +86,8 @@ while True:
             if tradesin5min != 0:
                 print('Heartbeat Sent to backpack.tf {} listings were bumped'.format(heartbeat))
                 tradesin5min = 0
-    except Exception as error:
-        print('ERROR',error)
-    time.sleep(15) # wait 15sec before checking again
+        # except Exception as error:
+        #     print(error)
+        time.sleep(15) # wait 15sec before checking again
 
 db.close()

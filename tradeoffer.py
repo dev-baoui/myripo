@@ -10,14 +10,14 @@ class TradeOffer:
 	""" This Class takes care of the incomming trades """
 	def __init__(self, offer=[]):
 		self.trade = offer
-		self.sqldata = self.sqlToDict(dbCur.execute("select * from items").fetchall())
+		self.sqldata = self.sqlToDict(dbCur.execute("select * from items"))
 		self.partnerObj = SteamID(offer.get('accountid_other'))
 		self.partner = self.partnerObj.as_64
 		self.offerId = offer.get('tradeofferid')
 		self.message = offer.get('message')
 		self.theirItems = self.getItemsInfo(self.itemName(offer.get('items_to_receive')))
 		self.ourItems = self.getItemsInfo(self.itemName(offer.get('items_to_give')))
-		self.keyPrice = self.sqlToDict(dbCur.execute("select * from items where item_name = 'Mann Co. Supply Crate Key'").fetchall())['Mann Co. Supply Crate Key']
+		self.keyPrice = self.sqlToDict(dbCur.execute("select * from items where item_name = 'Mann Co. Supply Crate Key'"))['Mann Co. Supply Crate Key']
 		self.currency = ['Scrap Metal', 'Reclaimed Metal', 'Refined Metal', 'Mann Co. Supply Crate Key']
 		self.settings = self.readJsonFile('Settings.json')
 	
@@ -94,11 +94,11 @@ class TradeOffer:
 				break
 		return False not in overpay
 
-	def sqlToDict(self, items:list = []) -> dict:
-		''' Converts the DB list of tuples into a dictionary with key=item_name '''
+	def sqlToDict(self, items: sqlite3.Cursor) -> dict:
+		''' this function Converts the DB list of tuples into a dictionary with key=item_name'''
 		newFormattedList = {}
-		for item in items:
-			newFormattedList[item[1]] = {'item_id': item[0], 'item_name': item[1], 'quality': item[2], 'img_url': item[3], 'buy': item[4], 'sell': item[5]}
+		for item in items.fetchall():
+			newFormattedList[item[1]] = {column[0]: item[index] for index, column in enumerate(items.description)}
 		return newFormattedList
 
 	def getItemsInfo(self, items={}) -> dict:
