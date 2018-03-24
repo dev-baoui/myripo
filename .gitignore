@@ -1,0 +1,9 @@
+Settings.json
+SteamGuard.json
+addItem.py
+
+/.vscode
+/.idea
+/__pycache__
+/botsite
+/test
