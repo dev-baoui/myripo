@@ -57,7 +57,6 @@ def check():
 
 
 if __name__ == "__main__":
-
     client = SteamClient(settings['steamApiKey'])
     print("""
     TF2 trading Bot
@@ -83,8 +82,10 @@ if __name__ == "__main__":
                 if tradesin5min > 0:
                     updateStock()
                     tradesin5min = 0
-        except ConnectionError as error:
-            print(error)
+        except Exception as error:
+            print(help(error))
+            print("#"*75)
+            print(dir(error))
         time.sleep(15) # wait 15sec before checking again
 
 
