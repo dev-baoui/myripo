@@ -72,20 +72,15 @@ def check():
 
 if __name__ == "__main__":
     start_time = time.time()
-    tradesin5min=0
     print('Checking for offers...')
-    print('Heartbeat Sent to backpack.tf {} listings were bumped'.format(tf2.bp_send_heartbeat()))
+    print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), tf2.bp_send_heartbeat()), end="")
 
     while True:
         try:
-            if check(): tradesin5min += 1
             # print("messages: ", client.chat.fetch_messages())
             if time.time() - start_time > 5*60:
                 start_time = time.time()
-                heartbeat = tf2.bp_send_heartbeat()
-                if tradesin5min != 0:
-                    print('Heartbeat Sent to backpack.tf {} listings were bumped'.format(heartbeat))
-                    tradesin5min = 0
+                print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), tf2.bp_send_heartbeat()), end="")
         except ConnectionError as error:
             print(error)
         time.sleep(15) # wait 15sec before checking again
