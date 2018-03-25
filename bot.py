@@ -1,8 +1,7 @@
 import time
 import json
 import sqlite3
-import pytf2
-from tradeoffer import SteamPlayer, TradeOffer
+from tradeoffer import SteamPlayer, TradeOffer, readJsonFile, send_heartbeat, my_inventory, updateStock
 from steampy.client import SteamClient
 
 
@@ -10,7 +9,7 @@ db = sqlite3.connect("tf2.db")
 dbCur = db.cursor()
 
 emptySettings = {'username': '', 'password': '', 'owner_id': '', 'steamApiKey': '', 'bp_api_key': '', 'bp_user_token': '', 'mp_api_key': '', 'overpay': 0}
-settings = TradeOffer.readJsonFile('Settings.json')
+settings = readJsonFile('Settings.json')
 if settings == {}:
     with open('Settings.json', 'w') as settingsJson:
         json.dump(emptySettings, settingsJson)
@@ -21,21 +20,8 @@ for set in settings:
         print('looks like you haven\'t filled up Settings.json yet, please do so before rebooting the bot')
         exit()
 
-tf2 = pytf2.Manager(bp_api_key=settings['bp_api_key'], bp_user_token=settings['bp_user_token'], mp_api_key=settings['mp_api_key'])
-
-client = SteamClient(settings['steamApiKey'])
-print("""
-TF2 trading Bot
-Created by: Devossa      Steam: https://steamcommunity.com/id/devossa
-""")
-print('Logging into Steam...\r', end="")
-client.login(settings['username'], settings['password'], 'SteamGuard.json')
-print("SUCCESSFULY LOGGED IN")
-
 
 tradesToIgnore = [trade[0] for trade in dbCur.execute('SELECT * FROM trades_history WHERE action="ignored"').fetchall()]
-
-
 
 
 def check():
@@ -71,18 +57,35 @@ def check():
 
 
 if __name__ == "__main__":
-    start_time = time.time()
-    print('Checking for offers...')
-    print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), tf2.bp_send_heartbeat()), end="")
 
+    client = SteamClient(settings['steamApiKey'])
+    print("""
+    TF2 trading Bot
+    Created by: Devossa      Steam: https://steamcommunity.com/id/devossa
+    """)
+    print('Logging into Steam...\r', end="")
+    client.login(settings['username'], settings['password'], 'SteamGuard.json')
+    print("SUCCESSFULY LOGGED IN")
+
+
+    start_time = time.time()
+    tradesin5min = 0
+    print('Checking for offers...')
+    print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), send_heartbeat()), end="")
+    
     while True:
         try:
+            if check(): tradesin5min += 1
             # print("messages: ", client.chat.fetch_messages())
             if time.time() - start_time > 5*60:
                 start_time = time.time()
-                print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), tf2.bp_send_heartbeat()), end="")
+                print('{} Heartbeat Sent to backpack.tf {} listings were bumped\r'.format(time.strftime("%H:%M:%S", time.gmtime()), send_heartbeat()), end="")
+                if tradesin5min > 0:
+                    updateStock()
+                    tradesin5min = 0
         except ConnectionError as error:
             print(error)
         time.sleep(15) # wait 15sec before checking again
+
 
 db.close()

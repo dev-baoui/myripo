@@ -1,10 +1,44 @@
 from steam import SteamID
 import sqlite3
 import json
-
+import pytf2
 
 db = sqlite3.connect("tf2.db")
 dbCur = db.cursor()
+
+######### Functions #########################################################################
+def readJsonFile(filename) -> dict:
+	try:
+		with open(filename) as fsonFile:
+			return json.load(fsonFile)
+	except FileNotFoundError:
+		return {}
+	except json.decoder.JSONDecodeError:
+		print('{} file isn\'t formatted correctly, please fix it.'.format(filename))
+		exit()
+
+def send_heartbeat():
+	return tf2.bp_send_heartbeat()
+
+def my_inventory(parse=True):
+	return tf2.s_get_inventory(settings['steamid'], parse=parse)
+
+def updateStock():
+	inventory = TradeOffer.fixItemName({str(index): {'market_name': item.market_name, 'descriptions': item.descriptions} for index, item in enumerate(my_inventory())})
+	dbItems = TradeOffer.sqlToDict(dbCur.execute('SELECT * FROM items'))
+	itemsWithAmount = TradeOffer.getItemsInfo(inventory, dbItems)
+	for item in itemsWithAmount:
+		dbCur.execute("UPDATE items SET current_stock=? WHERE item_name=?", (itemsWithAmount[item]['amount'], itemsWithAmount[item]['item_name']))
+		db.commit()
+	print("#"*75)
+	print("\tCurrent Stock value updated.")
+	print("#"*75)
+#############################################################################################
+
+
+settings = readJsonFile('Settings.json')
+tf2 = pytf2.Manager(bp_api_key=settings['bp_api_key'], bp_user_token=settings['bp_user_token'], mp_api_key=settings['mp_api_key'])
+
 
 class TradeOffer:
 	""" This Class takes care of the incomming trades """
@@ -15,11 +49,11 @@ class TradeOffer:
 		self.partner = self.partnerObj.as_64
 		self.offerId = offer.get('tradeofferid')
 		self.message = offer.get('message')
-		self.theirItems = self.getItemsInfo(self.itemName(offer.get('items_to_receive')))
-		self.ourItems = self.getItemsInfo(self.itemName(offer.get('items_to_give')))
+		self.theirItems = self.getItemsInfo(self.fixItemName(offer.get('items_to_receive')), self.sqldata)
+		self.ourItems = self.getItemsInfo(self.fixItemName(offer.get('items_to_give')), self.sqldata)
 		self.keyPrice = self.sqlToDict(dbCur.execute("select * from items where item_name = 'Mann Co. Supply Crate Key'"))['Mann Co. Supply Crate Key']
 		self.currency = ['Scrap Metal', 'Reclaimed Metal', 'Refined Metal', 'Mann Co. Supply Crate Key']
-		self.settings = self.readJsonFile('Settings.json')
+		self.settings = readJsonFile('Settings.json')
 	
 	def processOffer(self):
 		# NEEDS WORK
@@ -72,14 +106,23 @@ class TradeOffer:
 		else:
 			return ', '.join(['{}x {}'.format(self.ourItems[item]['amount'], item) for item in self.ourItems])
 
-	def itemName(self, items:dict) -> dict:
+	@staticmethod
+	def fixItemName(items:dict or list) -> dict or list:
 		''' This function add the "uncraftable" prefix if one of the items is unscraftable '''
-		for item in items:
-			descs = items[item].get('descriptions')
-			if descs != None:
-				for desc in descs: # type(descs) = list
-					if desc.get('value') == '( Not Usable in Crafting )':
-						items[item]['market_name'] = 'Non-Craftable ' + items[item]['market_name']
+		if type(items)==dict:
+			for item in items:
+				descs = items[item].get('descriptions')
+				if descs != None:
+					for desc in descs: # type(descs) = list
+						if desc.get('value') == '( Not Usable in Crafting )':
+							items[item]['market_name'] = 'Non-Craftable ' + items[item]['market_name']
+		elif type(items)==list:
+			for index in range(len(items)):
+				descs = items[index].get('descriptions')
+				if descs != None:
+					for desc in descs: # type(descs) = list
+						if desc.get('value') == '( Not Usable in Crafting )':
+							items[index]['market_name'] = 'Non-Craftable ' + items[index]['market_name']
 		return items
 
 	def overPayNeeded(self) -> bool:
@@ -94,20 +137,22 @@ class TradeOffer:
 				break
 		return False not in overpay
 
-	def sqlToDict(self, items: sqlite3.Cursor) -> dict:
+	@staticmethod
+	def sqlToDict(items: sqlite3.Cursor) -> dict:
 		''' this function Converts the DB list of tuples into a dictionary with key=item_name'''
 		newFormattedList = {}
 		for item in items.fetchall():
 			newFormattedList[item[1]] = {column[0]: item[index] for index, column in enumerate(items.description)}
 		return newFormattedList
 
-	def getItemsInfo(self, items={}) -> dict:
+	@staticmethod
+	def getItemsInfo(items={}, dbItems={}) -> dict:
 		newItemsDict = {}
 		for item in items:
 			itemName = items[item]['market_name']
-			if self.sqldata.get(itemName) != None:
+			if dbItems.get(itemName) != None:
 				if newItemsDict.get(itemName) == None:
-					newItemsDict[itemName] = self.sqldata[itemName]
+					newItemsDict[itemName] = dbItems[itemName]
 					newItemsDict[itemName].update({'amount': 1})
 				else:
 					newItemsDict[itemName]['amount'] += 1
@@ -136,17 +181,6 @@ class TradeOffer:
 				total += self.ourItems[itm]['sell']*self.ourItems[itm]['amount']
 		return total
 
-	@staticmethod
-	def readJsonFile(filename) -> dict:
-		try:
-			with open(filename) as fsonFile:
-				return json.load(fsonFile)
-		except FileNotFoundError:
-			return {}
-		except json.decoder.JSONDecodeError:
-			print('{} file isn\'t formatted correctly, please fix it.'.format(filename))
-			exit()
-
 
 class SteamPlayer:
 	''' This Class takes care of the partners stuff '''
@@ -155,5 +189,7 @@ class SteamPlayer:
 	
 	def isBanned(self):
 		return False
+
+
 
 # db.close()
